@@ -1,6 +1,8 @@
 package com.mawn;
 
 import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
@@ -11,8 +13,15 @@ import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+
 public class Search implements Runnable{
-	//not allown pages
 	private HashMap<String, ArrayList<String>> disallowListCache=new HashMap<>();
 	private ArrayList<String> errorList=new ArrayList<>();
 	private ArrayList<String> result=new ArrayList<>();
@@ -170,85 +179,66 @@ public class Search implements Runnable{
 	  { 
 	    
 	    System.out.println("searchString="+searchString);
+	    //the list have been crawled
 	    HashSet< String> crawledList = new HashSet< String>();
+	    //the list to be crawled
 	    LinkedHashSet< String> toCrawlList = new LinkedHashSet< String>();
-
-	     if (maxUrls < 1) {
-	        errorList.add("Invalid Max URLs value.");
-	        System.out.println("Invalid Max URLs value.");
-	      }
-	  
-	    
+	    //judge the initial circumstance
+	    if (maxUrls < 1) {
+	       errorList.add("Invalid Max URLs value.");
+	       System.out.println("Invalid Max URLs value.");
+	    }
 	    if (searchString.length() < 1) {
 	      errorList.add("Missing Search String.");
 	      System.out.println("Missing search String");
 	    }
-
-	    
 	    if (errorList.size() > 0) {
 	      System.out.println("err!!!");
 	      return errorList;
-	      }
-
-	    
-	    // 从开始URL中移出www
+	    }
+	    //remove wwws
 	    startUrl = removeWwwFromUrl(startUrl);
-
-	    
+	    //add the initial url
 	    toCrawlList.add(startUrl);
+	    
 	    while (toCrawlList.size() > 0) {
-	      
 	      if (maxUrls != -1) {
 	        if (crawledList.size() == maxUrls) {
 	          break;
 	        }
 	      }
-
 	      // Get URL at bottom of the list.
 	      String url =  toCrawlList.iterator().next();
-
 	      // Remove URL from the to crawl list.
 	      toCrawlList.remove(url);
-
 	      // Convert string url to URL object.
 	      URL verifiedUrl = verifyUrl(url);
-
 	      // Skip URL if robots are not allowed to access it.
 	      if (!isRobotAllowed(verifiedUrl)) {
 	        continue;
 	      }
-
-	    
-	      // 增加已处理的URL到crawledList
+	      // add URL to crawledList
 	      crawledList.add(url);
 	      String pageContents = downloadPage(verifiedUrl);
-
-	      
 	      if (pageContents != null && pageContents.length() > 0){
 	        // 从页面中获取有效的链接
 	        ArrayList< String> links =retrieveLinks(verifiedUrl, pageContents, crawledList,limitHost);
-	     
 	        toCrawlList.addAll(links);
-
 	        if (searchStringMatches(pageContents, searchString,caseSensitive))
 	        {
 	          result.add(url);
 	          System.out.println(url);
 	        }
 	     }
-
-	    
 	    }
 	   return result;
 	  }
 	
 	private boolean searchStringMatches(String pageContents, String searchString, boolean caseSensitive){
-	       String searchContents = pageContents; 
-	       if (!caseSensitive) {//如果不区分大小写
-	          searchContents = pageContents.toLowerCase();
-	       }
-
-	    
+	    String searchContents = pageContents; 
+	    if (!caseSensitive) {//如果不区分大小写
+	      searchContents = pageContents.toLowerCase();
+	    }
 	    Pattern p = Pattern.compile("[\\s]+");
 	    String[] terms = p.split(searchString);
 	    for (int i = 0; i < terms.length; i++) {
@@ -264,7 +254,33 @@ public class Search implements Runnable{
 	      }
 
 	    return true;
-	  }
+	 }
+	
+	private boolean loginSina(String userName,String passwrod){
+		HttpClient httpClient=new DefaultHttpClient();
+		HttpGet httpGet=new HttpGet("http://www.weibo.com?username=cafffe@163.com&password=cafffe123");
+		try {
+			HttpResponse httpResponse=httpClient.execute(httpGet);
+			HttpEntity httpEntity=httpResponse.getEntity();
+			if(httpEntity!=null){
+				InputStream inputStream=httpEntity.getContent();
+				BufferedReader bufferedReader=new BufferedReader(new InputStreamReader(inputStream));
+				String readline;
+				while((readline=bufferedReader.readLine())!=null){
+					String newString=new String( readline.getBytes(), "utf-8");
+					System.out.println(readline);
+				}
+				inputStream.close();
+			}
+		} catch (ClientProtocolException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return false;
+	}
 	public static void main(String[] args) {
 	     Scanner sc=new Scanner(System.in);
 	     String a=sc.nextLine();
@@ -272,9 +288,10 @@ public class Search implements Runnable{
 	     String c=sc.nextLine();
 	     int max=Integer.parseInt(b);
 	     Search crawler = new Search(a,max,c);
+	     crawler.loginSina("", "");
 	     Thread  search=new Thread(crawler);
 	     System.out.println("Start searching...");
 	     System.out.println("result:");
-	     search.start();
+	     //search.start();//a new thread
 	  }
 }
